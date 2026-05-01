@@ -334,49 +334,42 @@ export default apiInitializer("1.39.0", (api) => {
     });
   }
 
-  // Hide every level-3+ subcategory list (a div.subcategories sitting
-  // inside a level-2 td.category, inside the inner
-  // table.category-list.subcategories-with-subcategories). CSS attempts
-  // to do the same can lose to Discourse's default rules on certain
-  // installs; JS-applied inline `display: none` always wins. We do not
-  // .remove() the element — Ember keeps the data flow, we just hide it.
-  function hideDeepSubcategoryLists(scope) {
-    const root = scope || document;
-    // Cover both layouts: boxes (.subcategory > .subcategory-box-inner
-    // > .subcategories) and the rarer table layout (td.category >
-    // .subcategories inside the inner subcategories-with-subcategories
-    // table). The boxes form is what enableme.org renders.
+  // Flat subcategory display — copied 1:1 from the legacy
+  // discourse-flat-subcategories component (the original was a
+  // <script type="text/discourse-plugin"> + MutationObserver block).
+  // Removes deep (level-3+) subcategory lists and strips the
+  // .with-subcategories class so layout reverts to the "no children"
+  // look. Ember re-hydration on navigation is handled by the
+  // observer below.
+  function flattenBoxes(root = document) {
+    if (!/^\/c(ategories)?(\/|$)/.test(location.pathname)) return;
+
+    // 1) Remove any deep lists (level-3/4…)
+    root.querySelectorAll(".subcategory .subcategories").forEach((el) => el.remove());
+
+    // 2) Remove layout-trigger classes so styles revert to "no children" look
+    root.querySelectorAll(".subcategory.with-subcategories").forEach((el) => {
+      el.classList.remove("with-subcategories");
+    });
+    // Some installs add flags on the box itself; strip those too if present
     root
-      .querySelectorAll(
-        ".subcategory .subcategories, " +
-          ".subcategory-box-inner > .subcategories, " +
-          ".category-boxes .subcategories, " +
-          ".category-list.subcategories-with-subcategories .subcategories"
-      )
-      .forEach((el) => {
-        if (el.style.display !== "none") el.style.display = "none";
-      });
+      .querySelectorAll(".category-box.with-subcategories, .category.with-subcategories")
+      .forEach((el) => el.classList.remove("with-subcategories"));
   }
 
-  // Discourse renders top-level category sections progressively — running
-  // hideDeepSubcategoryLists() once on onPageChange catches whatever's in
-  // the DOM at that moment and misses sections that hydrate later. A
-  // single rAF-debounced MutationObserver on the categories root re-runs
-  // the hide whenever new descendants appear, then is GC'd once the root
-  // leaves the DOM (we keep no global reference to it).
-  function attachLevel3Observer(root) {
-    if (root.__hfL3Observed) return;
-    root.__hfL3Observed = true;
-    let scheduled = false;
-    const obs = new MutationObserver(() => {
-      if (scheduled) return;
-      scheduled = true;
-      requestAnimationFrame(() => {
-        scheduled = false;
-        hideDeepSubcategoryLists(root);
-      });
-    });
-    obs.observe(root, { childList: true, subtree: true });
+  const flattenContainer = () =>
+    document.querySelector(
+      ".category-boxes, .categories-list, .category-list, .categories-and-topics, .categories-and-latest"
+    );
+
+  function bootFlatten() {
+    flattenBoxes();
+    const root = flattenContainer();
+    if (root && !root._emFlattenMO) {
+      const mo = new MutationObserver(() => flattenBoxes(root));
+      mo.observe(root, { childList: true, subtree: true });
+      root._emFlattenMO = mo;
+    }
   }
 
   api.onPageChange(() => {
@@ -386,8 +379,7 @@ export default apiInitializer("1.39.0", (api) => {
       bindPopstate();
       bindDocumentClick(site);
       syncFromUrl(root);
-      hideDeepSubcategoryLists(root);
-      attachLevel3Observer(root);
+      bootFlatten();
     });
   });
 });

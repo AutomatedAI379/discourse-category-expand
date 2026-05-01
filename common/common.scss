@@ -132,47 +132,27 @@
   }
 }
 
-// =============================================================
-// Flat subcategory display (merged from the standalone
-// "flat-subcategories" component). Two visual changes on the
-// categories overview:
-//
-// 1. Hide level-3 subcategory lists. Discourse renders them as
-//    `<div class="subcategories">` inside a level-2 row inside a
-//    `<table class="category-list subcategories-with-subcategories">`.
-//    The legacy version of this used JS + a continuous MutationObserver
-//    to .remove() these from the DOM; CSS reaches the same end-state
-//    declaratively, with no observer churn or re-render races.
-//
-// 2. Subcategory-pill text uses normal weight (400) instead of
-//    bold (600/700) so it reads as secondary content next to the
-//    parent category title.
-// =============================================================
+// Flat subcategory display (copied 1:1 from the legacy
+// "flat-subcategories" component). The deep-list removal is handled
+// in JS (see category-expand.js → flattenBoxes); the rules below
+// only restyle the surviving level-2 subcategory pills.
 
-// Hide level-3 subcategory lists. The boxes layout nests them as:
-//   .subcategory.with-subcategories > .subcategory-box-inner > .subcategories
-// The (less common) table layout nests them as:
-//   table.category-list.subcategories-with-subcategories td.category > .subcategories
-// Both forms are covered below — the general rule is "a .subcategories
-// inside any .subcategory wrapper".
-.subcategory .subcategories,
-.subcategory-box-inner > .subcategories,
-.category-boxes .subcategories,
-.category-list.subcategories-with-subcategories .subcategories {
-  display: none !important;
+/* Subcategory rows inside Boxes: use normal weight text */
+.category-boxes .subcategory-box-inner .badge-category__name,
+.category-boxes-with-subcategories .subcategory-box-inner .badge-category__name,
+.category-boxes-with-topics .subcategory-box-inner .badge-category__name,
+.category-list .subcategory-box-inner .badge-category__name,
+.categories-list .subcategory-box-inner .badge-category__name {
+  font-weight: 400 !important;   /* was 600/700 */
 }
 
-.category-list.subcategories-with-subcategories .badge-category__name,
-.subcategory .badge-category__name,
-.subcategory-box-inner .badge-category__name,
-.badge-category.--has-parent .badge-category__name {
+/* Extra-safe: specifically when the badge has a parent (subcategory pills) */
+.subcategory-box-inner .badge-category.--has-parent .badge-category__name {
   font-weight: 400 !important;
 }
 
-// Top-level / parent box titles stay bold — override above where the
-// title is rendered inside an h3 / h4 in a category cell.
-.category-list .category h3 .badge-category__name,
-.category-list .category h4 .badge-category__name,
-.category-boxes .category h3 .badge-category__name {
+/* Keep box titles bold (do NOT touch these) */
+.category-boxes .category h3 .badge-category__name,
+.category-boxes-with-subcategories .category h3 .badge-category__name {
   font-weight: 700 !important;
 }
