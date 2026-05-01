@@ -340,15 +340,36 @@ export default apiInitializer("1.39.0", (api) => {
   // to do the same can lose to Discourse's default rules on certain
   // installs; JS-applied inline `display: none` always wins. We do not
   // .remove() the element — Ember keeps the data flow, we just hide it.
-  function hideDeepSubcategoryLists() {
-    if (!CAT_PATH_RE.test(location.pathname)) return;
-    document
+  function hideDeepSubcategoryLists(scope) {
+    const root = scope || document;
+    root
       .querySelectorAll(
         ".category-list .subcategories, .categories-list .subcategories"
       )
       .forEach((el) => {
         if (el.style.display !== "none") el.style.display = "none";
       });
+  }
+
+  // Discourse renders top-level category sections progressively — running
+  // hideDeepSubcategoryLists() once on onPageChange catches whatever's in
+  // the DOM at that moment and misses sections that hydrate later. A
+  // single rAF-debounced MutationObserver on the categories root re-runs
+  // the hide whenever new descendants appear, then is GC'd once the root
+  // leaves the DOM (we keep no global reference to it).
+  function attachLevel3Observer(root) {
+    if (root.__hfL3Observed) return;
+    root.__hfL3Observed = true;
+    let scheduled = false;
+    const obs = new MutationObserver(() => {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        hideDeepSubcategoryLists(root);
+      });
+    });
+    obs.observe(root, { childList: true, subtree: true });
   }
 
   api.onPageChange(() => {
@@ -358,7 +379,8 @@ export default apiInitializer("1.39.0", (api) => {
       bindPopstate();
       bindDocumentClick(site);
       syncFromUrl(root);
-      hideDeepSubcategoryLists();
+      hideDeepSubcategoryLists(root);
+      attachLevel3Observer(root);
     });
   });
 });
