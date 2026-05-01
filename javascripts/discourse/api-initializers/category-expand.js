@@ -1,8 +1,8 @@
 import { apiInitializer } from "discourse/lib/api";
 import { ajax } from "discourse/lib/ajax";
+import DiscourseURL from "discourse/lib/url";
 
 const ANIM_MS = 240;
-const STICKY_TOP = 0;
 const ROOT_SEL =
   ".category-list, .categories-list, .category-boxes, .categories-and-latest, .categories-and-topics";
 const CARD_SEL = ".category, .category-box";
@@ -26,7 +26,6 @@ function waitForRoot(cb) {
     }
   });
   mo.observe(document.body, { childList: true, subtree: true });
-  // Safety: stop watching after 10s if root never appears
   setTimeout(() => mo.disconnect(), 10000);
 }
 
@@ -36,6 +35,8 @@ function parseCatHref(href) {
 }
 
 function findCardFromEventTarget(target, root) {
+  // Don't treat clicks inside an open subcategory grid as card clicks
+  if (target.closest?.(".subcategory-grid")) return null;
   const card = target.closest(CARD_SEL);
   if (!card || !root.contains(card)) return null;
   if (card.dataset.categoryId) return card;
@@ -49,50 +50,45 @@ function findCardFromEventTarget(target, root) {
 }
 
 function hasSubcategories(site, id) {
-  const cat = site?.categoriesById?.[id] || site?.categories?.findBy?.("id", id);
-  if (!cat) return null; // unknown — let caller decide
+  const cat =
+    site?.categoriesById?.[id] ||
+    site?.categories?.findBy?.("id", id);
+  if (!cat) return null;
+  if (typeof cat.subcategory_count === "number")
+    return cat.subcategory_count > 0;
+  if (typeof cat.has_children === "boolean") return cat.has_children;
   if (Array.isArray(cat.subcategories)) return cat.subcategories.length > 0;
-  if (Array.isArray(cat.subcategory_ids)) return cat.subcategory_ids.length > 0;
-  if (Array.isArray(cat.subcategory_list)) return cat.subcategory_list.length > 0;
+  if (Array.isArray(cat.subcategory_ids))
+    return cat.subcategory_ids.length > 0;
+  if (Array.isArray(cat.subcategory_list))
+    return cat.subcategory_list.length > 0;
   return null;
 }
 
 async function loadSubcats(parentSlug, parentId) {
-  try {
-    const json = await ajax(
-      `/c/${encodeURIComponent(parentSlug)}/${parentId}.json`
-    );
-    const list =
-      json?.category?.subcategory_list || json?.subcategory_list || [];
-    return list.map((s) => ({
-      id: s.id,
-      name: s.name,
-      url:
-        s.url && s.url.startsWith("/c/")
-          ? s.url
-          : `/c/${parentSlug}/${s.slug}/${s.id}`,
-    }));
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error("[category-expand] loadSubcats error", e);
-    throw e;
-  }
+  const json = await ajax(
+    `/c/${encodeURIComponent(parentSlug)}/${parentId}.json`
+  );
+  const list =
+    json?.category?.subcategory_list || json?.subcategory_list || [];
+  return list.map((s) => ({
+    id: s.id,
+    name: s.name,
+    url:
+      s.url && s.url.startsWith("/c/")
+        ? s.url
+        : `/c/${parentSlug}/${s.slug}/${s.id}`,
+  }));
 }
 
 function renderTiles(grid, subs) {
   grid.replaceChildren();
-  if (!subs.length) {
-    const empty = document.createElement("div");
-    empty.className = "subcategory-empty";
-    empty.textContent = "No subcategories";
-    grid.appendChild(empty);
-    return;
-  }
   const frag = document.createDocumentFragment();
   for (const s of subs) {
     const a = document.createElement("a");
     a.className = "subcategory-tile";
     a.href = s.url;
+    a.title = s.name ?? "";
     const title = document.createElement("div");
     title.className = "subcategory-title";
     title.textContent = s.name ?? "";
@@ -114,8 +110,8 @@ function collapse(card, { updateUrl = false } = {}) {
   if (!card) return;
   card.classList.remove("category--expanded");
   card.setAttribute("aria-expanded", "false");
-  const grid = card.nextElementSibling;
-  if (grid?.classList?.contains("subcategory-grid")) {
+  const grid = card.querySelector(":scope > .subcategory-grid");
+  if (grid) {
     grid.style.maxHeight = grid.scrollHeight + "px";
     requestAnimationFrame(() => {
       grid.style.maxHeight = "0px";
@@ -136,21 +132,35 @@ function collapse(card, { updateUrl = false } = {}) {
 async function expand(card, { pushUrl = true } = {}) {
   const root = getRoot();
   if (!root) return;
-  root
-    .querySelectorAll(".category--expanded")
-    .forEach((el) => collapse(el));
-
   const slug = card.dataset.categorySlug;
   const id = Number(card.dataset.categoryId);
 
-  card.classList.add("category--expanded");
-  card.setAttribute("aria-expanded", "true");
-  card.style.setProperty("--sticky-top", STICKY_TOP + "px");
-
-  if (card.nextElementSibling?.classList?.contains("subcategory-grid")) {
-    card.nextElementSibling.remove();
+  // Fetch first — avoids any flicker for empty categories
+  let subs;
+  try {
+    subs = await loadSubcats(slug, id);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error("[category-expand] loadSubcats error", e);
+    subs = null;
   }
 
+  // Empty category → just navigate, never show an empty band
+  if (Array.isArray(subs) && subs.length === 0) {
+    DiscourseURL.routeTo(`/c/${slug}/${id}`);
+    return;
+  }
+
+  // Close any other open card
+  root
+    .querySelectorAll(".category--expanded")
+    .forEach((el) => el !== card && collapse(el));
+
+  card.classList.add("category--expanded");
+  card.setAttribute("aria-expanded", "true");
+
+  // Append grid as a CHILD of the card (positioning context)
+  card.querySelector(":scope > .subcategory-grid")?.remove();
   const grid = document.createElement("div");
   grid.className = "subcategory-grid";
   grid.id = `subcat-grid-${id}`;
@@ -158,13 +168,12 @@ async function expand(card, { pushUrl = true } = {}) {
   grid.setAttribute("aria-label", `Subcategories of ${slug}`);
   grid.style.setProperty("--anim-ms", ANIM_MS + "ms");
   card.setAttribute("aria-controls", grid.id);
-  card.insertAdjacentElement("afterend", grid);
+  card.appendChild(grid);
 
-  try {
-    const subs = await loadSubcats(slug, id);
-    renderTiles(grid, subs);
-  } catch (_e) {
+  if (subs === null) {
     renderError(grid);
+  } else {
+    renderTiles(grid, subs);
   }
 
   grid.style.maxHeight = "0px";
@@ -210,7 +219,7 @@ function syncFromUrl(root) {
 }
 
 function onKeydown(evt, root, site) {
-  // Escape closes any open expansion
+  if (evt.target.closest?.(".subcategory-grid")) return;
   if (evt.key === "Escape") {
     const open = root.querySelector(".category--expanded");
     if (open) {
@@ -219,11 +228,9 @@ function onKeydown(evt, root, site) {
     }
     return;
   }
-  // Enter / Space on a card toggles expansion
   if (evt.key !== "Enter" && evt.key !== " ") return;
   const card = findCardFromEventTarget(evt.target, root);
   if (!card) return;
-  // No subcategories → let the link's default behavior navigate
   if (hasSubcategories(site, Number(card.dataset.categoryId)) === false) {
     return;
   }
@@ -239,7 +246,6 @@ function attach(root, site) {
   if (attachedRoots.has(root)) return;
   attachedRoots.add(root);
 
-  // Mark cards as button-like for assistive tech
   root.querySelectorAll(CARD_SEL).forEach((card) => {
     if (!card.hasAttribute("aria-expanded")) {
       card.setAttribute("aria-expanded", "false");
@@ -254,9 +260,8 @@ function attach(root, site) {
     (evt) => {
       const card = findCardFromEventTarget(evt.target, root);
       if (!card) return;
-      // Allow modifier-clicks to open in new tab / window
       if (evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) return;
-      // No subcategories → don't intercept, let Discourse navigate normally
+      // Pre-check via Site service: if known empty, skip fetch + navigate
       if (hasSubcategories(site, Number(card.dataset.categoryId)) === false) {
         return;
       }
@@ -272,6 +277,24 @@ function attach(root, site) {
   );
 
   root.addEventListener("keydown", (evt) => onKeydown(evt, root, site));
+}
+
+let outsideClickBound = false;
+function bindOutsideClick() {
+  if (outsideClickBound) return;
+  outsideClickBound = true;
+  document.addEventListener(
+    "click",
+    (evt) => {
+      const root = getRoot();
+      if (!root) return;
+      const open = root.querySelector(".category--expanded");
+      if (!open) return;
+      if (open.contains(evt.target)) return;
+      collapse(open, { updateUrl: true });
+    },
+    true
+  );
 }
 
 export default apiInitializer("1.39.0", (api) => {
@@ -293,6 +316,7 @@ export default apiInitializer("1.39.0", (api) => {
     waitForRoot((root) => {
       attach(root, site);
       bindPopstate();
+      bindOutsideClick();
       syncFromUrl(root);
     });
   });

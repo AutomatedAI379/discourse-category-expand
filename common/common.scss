@@ -1,24 +1,37 @@
 // Discourse theme component: inline subcategory expansion on /categories.
-// Behavior is preserved 1:1 with the original inline component — only the
-// implementation is modernized (withPluginApi, a11y, popstate, leak-free).
+//
+// Layout strategy: the subcategory grid is appended *inside* the clicked
+// category card and absolutely positioned below it. This keeps every other
+// card in the layout fixed in place — nothing shifts when expanding.
 
 .category--expanded {
-  position: sticky;
-  top: var(--sticky-top, 0px);
-  z-index: 2;
+  position: relative;
+  z-index: 10;
   background: var(--secondary, #fff);
   border-radius: 12px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
 }
 
 .subcategory-grid {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: max(100%, 320px);
+  z-index: 11;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px;
+
+  background: var(--secondary, #fff);
+  border: 1px solid var(--primary-low, #e5e7eb);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.10);
+
   overflow: hidden;
   max-height: 0;
   opacity: 0;
-  padding: 0 0 12px 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
   transition:
     max-height var(--anim-ms, 240ms) ease,
     opacity var(--anim-ms, 240ms) ease;
@@ -30,12 +43,20 @@
 
 .subcategory-tile {
   display: block;
-  padding: 14px 16px;
-  border-radius: 12px;
+  min-width: 0;
+  overflow: hidden;
+
+  padding: 12px 14px;
+  border-radius: 10px;
   border: 1px solid var(--primary-low, #e5e7eb);
   background: var(--secondary, #fff);
   text-decoration: none;
   font-weight: 700;
+  color: var(--primary, #111827);
+
+  &:hover {
+    border-color: var(--tertiary, #08c);
+  }
 
   &:focus-visible {
     outline: 2px solid var(--tertiary, #08c);
@@ -43,21 +64,26 @@
   }
 }
 
-.subcategory-empty,
-.subcategory-error {
-  grid-column: 1 / -1;
-  padding: 12px;
-  color: var(--primary-medium, #6b7280);
+.subcategory-title {
+  display: block;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .subcategory-error {
+  grid-column: 1 / -1;
+  padding: 8px 4px;
   color: var(--danger, #dc2626);
+  font-weight: 500;
 }
 
 @media (max-width: 680px) {
   .subcategory-grid {
     grid-template-columns: 1fr;
     gap: 8px;
+    width: 100%;
   }
 }
 
