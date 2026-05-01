@@ -48,6 +48,15 @@ function findCardFromEventTarget(target, root) {
   return card;
 }
 
+function hasSubcategories(site, id) {
+  const cat = site?.categoriesById?.[id] || site?.categories?.findBy?.("id", id);
+  if (!cat) return null; // unknown — let caller decide
+  if (Array.isArray(cat.subcategories)) return cat.subcategories.length > 0;
+  if (Array.isArray(cat.subcategory_ids)) return cat.subcategory_ids.length > 0;
+  if (Array.isArray(cat.subcategory_list)) return cat.subcategory_list.length > 0;
+  return null;
+}
+
 async function loadSubcats(parentSlug, parentId) {
   try {
     const json = await ajax(
@@ -200,7 +209,7 @@ function syncFromUrl(root) {
   }
 }
 
-function onKeydown(evt, root) {
+function onKeydown(evt, root, site) {
   // Escape closes any open expansion
   if (evt.key === "Escape") {
     const open = root.querySelector(".category--expanded");
@@ -214,6 +223,10 @@ function onKeydown(evt, root) {
   if (evt.key !== "Enter" && evt.key !== " ") return;
   const card = findCardFromEventTarget(evt.target, root);
   if (!card) return;
+  // No subcategories → let the link's default behavior navigate
+  if (hasSubcategories(site, Number(card.dataset.categoryId)) === false) {
+    return;
+  }
   evt.preventDefault();
   if (card.classList.contains("category--expanded")) {
     collapse(card, { updateUrl: true });
@@ -222,7 +235,7 @@ function onKeydown(evt, root) {
   }
 }
 
-function attach(root) {
+function attach(root, site) {
   if (attachedRoots.has(root)) return;
   attachedRoots.add(root);
 
@@ -243,6 +256,10 @@ function attach(root) {
       if (!card) return;
       // Allow modifier-clicks to open in new tab / window
       if (evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) return;
+      // No subcategories → don't intercept, let Discourse navigate normally
+      if (hasSubcategories(site, Number(card.dataset.categoryId)) === false) {
+        return;
+      }
       evt.preventDefault();
       evt.stopPropagation();
       if (card.classList.contains("category--expanded")) {
@@ -254,10 +271,11 @@ function attach(root) {
     true
   );
 
-  root.addEventListener("keydown", (evt) => onKeydown(evt, root));
+  root.addEventListener("keydown", (evt) => onKeydown(evt, root, site));
 }
 
 export default apiInitializer("1.39.0", (api) => {
+  const site = api.container.lookup("service:site");
   let popstateBound = false;
 
   function bindPopstate() {
@@ -273,7 +291,7 @@ export default apiInitializer("1.39.0", (api) => {
   api.onPageChange(() => {
     if (!CAT_PATH_RE.test(location.pathname)) return;
     waitForRoot((root) => {
-      attach(root);
+      attach(root, site);
       bindPopstate();
       syncFromUrl(root);
     });

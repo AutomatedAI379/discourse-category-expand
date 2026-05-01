@@ -9,6 +9,9 @@ when a parent category is clicked.
 - Click a parent category card → its subcategories appear as a tile grid
   directly below the card (animated open)
 - Click the same card again, click another parent, or press `Escape` → close
+- Categories that have **no subcategories** are not intercepted — clicks
+  navigate normally to the category page (no awkward "no subcategories"
+  empty band)
 - The expanded parent stays sticky to the top while scrolling through the
   subcategory grid
 - URL gets `?parent=<slug>` so the open state is shareable / bookmarkable

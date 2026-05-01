@@ -45,6 +45,7 @@
 
 .subcategory-empty,
 .subcategory-error {
+  grid-column: 1 / -1;
   padding: 12px;
   color: var(--primary-medium, #6b7280);
 }
