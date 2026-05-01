@@ -1,0 +1,67 @@
+// Discourse theme component: inline subcategory expansion on /categories.
+// Behavior is preserved 1:1 with the original inline component — only the
+// implementation is modernized (withPluginApi, a11y, popstate, leak-free).
+
+.category--expanded {
+  position: sticky;
+  top: var(--sticky-top, 0px);
+  z-index: 2;
+  background: var(--secondary, #fff);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.subcategory-grid {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  padding: 0 0 12px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  transition:
+    max-height var(--anim-ms, 240ms) ease,
+    opacity var(--anim-ms, 240ms) ease;
+
+  &.open {
+    opacity: 1;
+  }
+}
+
+.subcategory-tile {
+  display: block;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--primary-low, #e5e7eb);
+  background: var(--secondary, #fff);
+  text-decoration: none;
+  font-weight: 700;
+
+  &:focus-visible {
+    outline: 2px solid var(--tertiary, #08c);
+    outline-offset: 2px;
+  }
+}
+
+.subcategory-empty,
+.subcategory-error {
+  padding: 12px;
+  color: var(--primary-medium, #6b7280);
+}
+
+.subcategory-error {
+  color: var(--danger, #dc2626);
+}
+
+@media (max-width: 680px) {
+  .subcategory-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subcategory-grid {
+    transition: none;
+  }
+}
