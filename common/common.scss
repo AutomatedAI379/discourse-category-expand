@@ -149,13 +149,16 @@
 //    parent category title.
 // =============================================================
 
-// Broad selector: any div.subcategories inside any category list
-// (top-level table or the inner subcategories-with-subcategories one).
-// The wrapping <table> has class "subcategories-with-subcategories",
-// which is a different token, so this rule does not affect it.
-.category-list .subcategories,
-.categories-list .subcategories,
-.subcategories-with-subcategories > tbody .subcategories {
+// Hide level-3 subcategory lists. The boxes layout nests them as:
+//   .subcategory.with-subcategories > .subcategory-box-inner > .subcategories
+// The (less common) table layout nests them as:
+//   table.category-list.subcategories-with-subcategories td.category > .subcategories
+// Both forms are covered below — the general rule is "a .subcategories
+// inside any .subcategory wrapper".
+.subcategory .subcategories,
+.subcategory-box-inner > .subcategories,
+.category-boxes .subcategories,
+.category-list.subcategories-with-subcategories .subcategories {
   display: none !important;
 }
 

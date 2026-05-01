@@ -342,9 +342,16 @@ export default apiInitializer("1.39.0", (api) => {
   // .remove() the element — Ember keeps the data flow, we just hide it.
   function hideDeepSubcategoryLists(scope) {
     const root = scope || document;
+    // Cover both layouts: boxes (.subcategory > .subcategory-box-inner
+    // > .subcategories) and the rarer table layout (td.category >
+    // .subcategories inside the inner subcategories-with-subcategories
+    // table). The boxes form is what enableme.org renders.
     root
       .querySelectorAll(
-        ".category-list .subcategories, .categories-list .subcategories"
+        ".subcategory .subcategories, " +
+          ".subcategory-box-inner > .subcategories, " +
+          ".category-boxes .subcategories, " +
+          ".category-list.subcategories-with-subcategories .subcategories"
       )
       .forEach((el) => {
         if (el.style.display !== "none") el.style.display = "none";
