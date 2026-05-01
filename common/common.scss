@@ -79,6 +79,45 @@
   font-weight: 500;
 }
 
+// Truncate long parent-category titles to a single line with ellipsis on
+// the categories overview. Discourse wraps the title in 5+ nested spans;
+// each level needs to allow shrinking so the innermost can ellipsis.
+.category-list,
+.category-boxes,
+.categories-list,
+.categories-and-latest,
+.categories-and-topics {
+  .category-text-title {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .category-text-title .category-name,
+  .category-text-title .category-name > span,
+  .category-text-title .badge-category__wrapper {
+    display: flex;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .category-text-title .badge-category {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .category-text-title .badge-category__name {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 @media (max-width: 680px) {
   .subcategory-grid {
     grid-template-columns: 1fr;
