@@ -192,11 +192,16 @@ async function expand(card, { pushUrl = true } = {}) {
 }
 
 function findCardBySlug(root, slug) {
+  return findCardForCategory(root, null, slug);
+}
+
+function findCardForCategory(root, id, slug) {
   const cards = Array.from(root.querySelectorAll(CARD_SEL));
   for (const c of cards) {
+    if (id != null && c.dataset.categoryId === String(id)) return c;
     const a = c.querySelector("a[href^='/c/']");
     const p = a && parseCatHref(a.getAttribute("href"));
-    if (p && p.slug === slug) {
+    if (p && ((id != null && p.id === id) || p.slug === slug)) {
       c.dataset.categorySlug = p.slug;
       c.dataset.categoryId = String(p.id);
       return c;
@@ -255,43 +260,61 @@ function attach(root, site) {
     }
   });
 
-  root.addEventListener(
-    "click",
-    (evt) => {
-      const card = findCardFromEventTarget(evt.target, root);
-      if (!card) return;
-      if (evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) return;
-      // Pre-check via Site service: if known empty, skip fetch + navigate
-      if (hasSubcategories(site, Number(card.dataset.categoryId)) === false) {
-        return;
-      }
-      evt.preventDefault();
-      evt.stopPropagation();
-      if (card.classList.contains("category--expanded")) {
-        collapse(card, { updateUrl: true });
-      } else {
-        expand(card);
-      }
-    },
-    true
-  );
-
   root.addEventListener("keydown", (evt) => onKeydown(evt, root, site));
 }
 
-let outsideClickBound = false;
-function bindOutsideClick() {
-  if (outsideClickBound) return;
-  outsideClickBound = true;
+let docClickBound = false;
+function bindDocumentClick(site) {
+  if (docClickBound) return;
+  docClickBound = true;
   document.addEventListener(
     "click",
     (evt) => {
+      // Only act on the categories overview / category pages
+      if (!CAT_PATH_RE.test(location.pathname)) return;
+      // Never hijack clicks inside our own subcategory overlay
+      if (evt.target.closest?.(".subcategory-grid")) return;
+
       const root = getRoot();
       if (!root) return;
       const open = root.querySelector(".category--expanded");
-      if (!open) return;
-      if (open.contains(evt.target)) return;
-      collapse(open, { updateUrl: true });
+
+      // Allow modifier-clicks (open in new tab / window)
+      if (evt.metaKey || evt.ctrlKey || evt.shiftKey || evt.altKey) {
+        return;
+      }
+
+      // Did the click hit a category link anywhere on the page?
+      const link = evt.target.closest?.("a[href^='/c/']");
+      const parsed = link && parseCatHref(link.getAttribute("href"));
+
+      if (parsed) {
+        // Map the link to a card in the categories root, even if the link
+        // itself is rendered outside the card (e.g. a separate arrow element)
+        let card = link.closest(CARD_SEL);
+        if (!card || !root.contains(card)) {
+          card = findCardForCategory(root, parsed.id, parsed.slug);
+        }
+        if (card) {
+          card.dataset.categorySlug = parsed.slug;
+          card.dataset.categoryId = String(parsed.id);
+          // Pre-check: if known empty, let the normal navigation happen
+          if (hasSubcategories(site, parsed.id) === false) return;
+          evt.preventDefault();
+          evt.stopPropagation();
+          if (card.classList.contains("category--expanded")) {
+            collapse(card, { updateUrl: true });
+          } else {
+            expand(card);
+          }
+          return;
+        }
+      }
+
+      // Click outside any card and not on a category link → close open one
+      if (open && !open.contains(evt.target)) {
+        collapse(open, { updateUrl: true });
+      }
     },
     true
   );
@@ -316,7 +339,7 @@ export default apiInitializer("1.39.0", (api) => {
     waitForRoot((root) => {
       attach(root, site);
       bindPopstate();
-      bindOutsideClick();
+      bindDocumentClick(site);
       syncFromUrl(root);
     });
   });
