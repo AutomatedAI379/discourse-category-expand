@@ -334,6 +334,23 @@ export default apiInitializer("1.39.0", (api) => {
     });
   }
 
+  // Hide every level-3+ subcategory list (a div.subcategories sitting
+  // inside a level-2 td.category, inside the inner
+  // table.category-list.subcategories-with-subcategories). CSS attempts
+  // to do the same can lose to Discourse's default rules on certain
+  // installs; JS-applied inline `display: none` always wins. We do not
+  // .remove() the element — Ember keeps the data flow, we just hide it.
+  function hideDeepSubcategoryLists() {
+    if (!CAT_PATH_RE.test(location.pathname)) return;
+    document
+      .querySelectorAll(
+        ".category-list .subcategories, .categories-list .subcategories"
+      )
+      .forEach((el) => {
+        if (el.style.display !== "none") el.style.display = "none";
+      });
+  }
+
   api.onPageChange(() => {
     if (!CAT_PATH_RE.test(location.pathname)) return;
     waitForRoot((root) => {
@@ -341,6 +358,7 @@ export default apiInitializer("1.39.0", (api) => {
       bindPopstate();
       bindDocumentClick(site);
       syncFromUrl(root);
+      hideDeepSubcategoryLists();
     });
   });
 });

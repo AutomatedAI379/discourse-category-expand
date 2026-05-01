@@ -149,7 +149,13 @@
 //    parent category title.
 // =============================================================
 
-.category-list.subcategories-with-subcategories .subcategories {
+// Broad selector: any div.subcategories inside any category list
+// (top-level table or the inner subcategories-with-subcategories one).
+// The wrapping <table> has class "subcategories-with-subcategories",
+// which is a different token, so this rule does not affect it.
+.category-list .subcategories,
+.categories-list .subcategories,
+.subcategories-with-subcategories > tbody .subcategories {
   display: none !important;
 }
 
