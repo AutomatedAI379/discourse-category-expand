@@ -17,6 +17,18 @@ when a parent category is clicked.
 - URL gets `?parent=<slug>` so the open state is shareable / bookmarkable
 - Browser back / forward buttons sync the open state correctly
 
+### Flat subcategory display (CSS)
+
+Bundled in the same component because it operates on the same page and
+the same content:
+
+- Level-3 subcategory lists (`.subcategories` blocks inside a level-2
+  row of a `subcategories-with-subcategories` table) are hidden — the
+  in-flow view stays one level deep, with deep navigation handled by the
+  click-to-expand behavior above.
+- Subcategory pills render at normal font-weight (400) so they read as
+  secondary content; parent box / row titles stay bold (700).
+
 ## What this is a refactor of
 
 This replaces the legacy inline component that used the deprecated

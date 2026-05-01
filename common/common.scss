@@ -131,3 +131,39 @@
     transition: none;
   }
 }
+
+// =============================================================
+// Flat subcategory display (merged from the standalone
+// "flat-subcategories" component). Two visual changes on the
+// categories overview:
+//
+// 1. Hide level-3 subcategory lists. Discourse renders them as
+//    `<div class="subcategories">` inside a level-2 row inside a
+//    `<table class="category-list subcategories-with-subcategories">`.
+//    The legacy version of this used JS + a continuous MutationObserver
+//    to .remove() these from the DOM; CSS reaches the same end-state
+//    declaratively, with no observer churn or re-render races.
+//
+// 2. Subcategory-pill text uses normal weight (400) instead of
+//    bold (600/700) so it reads as secondary content next to the
+//    parent category title.
+// =============================================================
+
+.category-list.subcategories-with-subcategories .subcategories {
+  display: none !important;
+}
+
+.category-list.subcategories-with-subcategories .badge-category__name,
+.subcategory .badge-category__name,
+.subcategory-box-inner .badge-category__name,
+.badge-category.--has-parent .badge-category__name {
+  font-weight: 400 !important;
+}
+
+// Top-level / parent box titles stay bold — override above where the
+// title is rendered inside an h3 / h4 in a category cell.
+.category-list .category h3 .badge-category__name,
+.category-list .category h4 .badge-category__name,
+.category-boxes .category h3 .badge-category__name {
+  font-weight: 700 !important;
+}
